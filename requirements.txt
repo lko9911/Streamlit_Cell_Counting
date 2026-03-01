@@ -1,6 +1,7 @@
+streamlit
 opencv-python-headless
 numpy
-cellpose
+cellpose==3.0.10
 Pillow
 pandas
 torch
