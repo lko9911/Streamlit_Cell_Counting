@@ -1,8 +1,6 @@
 streamlit
+cellpose==2.2.3
+torch
 opencv-python-headless
 numpy
-cellpose
 Pillow
-pandas
-torch
-torchvision
