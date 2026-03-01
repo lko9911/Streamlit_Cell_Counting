@@ -4,3 +4,4 @@ torch
 opencv-python-headless
 numpy
 Pillow
+streamlit-image-coordinates
