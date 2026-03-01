@@ -105,18 +105,46 @@ if st.session_state.state["analyzed"]:
 
     st.subheader("📊 분석 결과 시각화")
     
-    # 좌표 획득
-    coords = streamlit_image_coordinates(cv2.cvtColor(output, cv2.COLOR_BGR2RGB), use_column_width=True, key="viewer")
-
+    # -----------------------
+    # 🖱 클릭 처리
+    # -----------------------
     if coords and edit_mode != "보기 전용":
-        x, y = int(coords["x"]), int(coords["y"])
-        if 0 <= y < s["masks"].shape[0] and 0 <= x < s["masks"].shape[1]:
-            cid = s["masks"][y, x]
-            if cid > 0:
+        
+        # 1. 원본 이미지 크기
+        orig_h, orig_w = masks.shape[:2]
+        
+        # 2. 현재 화면에 표시된 이미지 크기 (컴포넌트에서 반환해줌)
+        disp_w = coords["width"]
+        disp_h = coords["height"]
+        
+        # 3. 비율 계산 및 좌표 변환
+        x_ratio = orig_w / disp_w
+        y_ratio = orig_h / disp_h
+        
+        real_x = int(coords["x"] * x_ratio)
+        real_y = int(coords["y"] * y_ratio)
+    
+        # 🔥 변환된 좌표로 안전 범위 체크
+        if 0 <= real_y < orig_h and 0 <= real_x < orig_w:
+            cell_id = masks[real_y, real_x]
+            
+            if cell_id != 0:
                 if edit_mode == "감염 토글":
-                    s["infected"].remove(cid) if cid in s["infected"] else s["infected"].add(cid)
+                    if cell_id in infected_cells:
+                        infected_cells.remove(cell_id)
+                    else:
+                        infected_cells.add(cell_id)
+    
                 elif edit_mode == "유효 RBC 토글":
-                    s["valid"].remove(cid) if cid in s["valid"] else s["valid"].add(cid)
+                    if cell_id in valid_cells:
+                        valid_cells.remove(cell_id)
+                    else:
+                        valid_cells.add(cell_id)
+                
+                # 세션 상태 강제 업데이트 (필요 시)
+                st.session_state.valid = valid_cells
+                st.session_state.infected = infected_cells
+                
                 st.rerun()
 
     # 🏥 진단 통계
