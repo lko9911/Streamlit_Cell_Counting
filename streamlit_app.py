@@ -151,47 +151,30 @@ if st.session_state.analyzed:
     # 🖱 클릭 처리
     # -----------------------
     if coords and edit_mode != "보기 전용":
-
+    
         x = int(coords["x"])
         y = int(coords["y"])
-        
+    
+        # 🔥 안전 범위 체크
         if 0 <= y < masks.shape[0] and 0 <= x < masks.shape[1]:
-        
+    
             cell_id = masks[y, x]
-        
+    
             if cell_id != 0:
-        
+    
                 if edit_mode == "감염 토글":
                     if cell_id in infected_cells:
                         infected_cells.remove(cell_id)
                     else:
                         infected_cells.add(cell_id)
-        
+    
                 elif edit_mode == "유효 RBC 토글":
                     if cell_id in valid_cells:
                         valid_cells.remove(cell_id)
                     else:
                         valid_cells.add(cell_id)
-        
+    
                 st.rerun()
-
-        cell_id = masks[y, x]
-
-        if cell_id != 0:
-
-            if edit_mode == "감염 토글":
-                if cell_id in infected_cells:
-                    infected_cells.remove(cell_id)
-                else:
-                    infected_cells.add(cell_id)
-
-            elif edit_mode == "유효 RBC 토글":
-                if cell_id in valid_cells:
-                    valid_cells.remove(cell_id)
-                else:
-                    valid_cells.add(cell_id)
-
-            st.rerun()
 
     # -----------------------
     # 🏥 진단 패널
