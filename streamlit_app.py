@@ -39,7 +39,7 @@ st.markdown('<div class="subtitle">AI 기반 적혈구 감염 분석 시스템 (
 # ===============================
 @st.cache_resource
 def load_model():
-    return Cellpose(gpu=False, model_type="cyto3")
+    return Cellpose(gpu=False, model_type="cyto")
 
 def process_analysis(img_bgr, model):
     img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
