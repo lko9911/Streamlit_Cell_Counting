@@ -1,0 +1,7 @@
+opencv-python-headless
+numpy
+cellpose
+Pillow
+pandas
+torch
+torchvision
