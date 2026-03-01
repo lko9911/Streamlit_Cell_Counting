@@ -105,12 +105,14 @@ if st.session_state.state["analyzed"]:
 
     st.subheader("📊 분석 결과 시각화")
 
-    # 1. 여기서 coords 변수가 생성됩니다.
+    # 🔎 표시용 이미지 설정
+    display_img = cv2.cvtColor(output, cv2.COLOR_BGR2RGB)
     coords = streamlit_image_coordinates(
         display_img,
         key="click",
         use_column_width=True
     )
+    
     # -----------------------
     # 🖱 클릭 처리
     # -----------------------
