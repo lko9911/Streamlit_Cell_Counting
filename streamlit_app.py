@@ -137,12 +137,7 @@ if st.session_state.analyzed:
     # -----------------------
     # 🔎 표시용 리사이즈 (원본은 유지)
     # -----------------------
-    display_img = output_rgb.copy()
-    max_width = 1400
-    if display_img.shape[1] > max_width:
-        scale = max_width / display_img.shape[1]
-        new_dim = (int(display_img.shape[1]*scale), int(display_img.shape[0]*scale))
-        display_img = cv2.resize(display_img, new_dim)
+    display_img = output_rgb
 
     st.subheader("📊 분석 결과 (이미지를 클릭하여 수정)")
 
