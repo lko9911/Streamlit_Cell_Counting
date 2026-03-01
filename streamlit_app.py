@@ -7,7 +7,7 @@ from streamlit_image_coordinates import streamlit_image_coordinates
 st.set_page_config(layout="wide")
 
 # ===============================
-# 🎨 병원 스타일 UI
+# 🎨 UI 설정
 # ===============================
 st.markdown("""
 <style>
@@ -23,7 +23,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown('<div class="title">🧪 Malaria Diagnostic System</div>', unsafe_allow_html=True)
-st.write("AI 기반 적혈구 감염 분석 시스템")
+st.write("AI 기반 적혈구 감염 분석 시스템 (Cell Counting)")
 
 # ===============================
 # 📦 모델 캐싱
@@ -152,11 +152,28 @@ if st.session_state.analyzed:
     # -----------------------
     if coords and edit_mode != "보기 전용":
 
-        scale_x = orig_bgr.shape[1] / display_img.shape[1]
-        scale_y = orig_bgr.shape[0] / display_img.shape[0]
-
-        x = int(coords["x"] * scale_x)
-        y = int(coords["y"] * scale_y)
+        x = int(coords["x"])
+        y = int(coords["y"])
+        
+        if 0 <= y < masks.shape[0] and 0 <= x < masks.shape[1]:
+        
+            cell_id = masks[y, x]
+        
+            if cell_id != 0:
+        
+                if edit_mode == "감염 토글":
+                    if cell_id in infected_cells:
+                        infected_cells.remove(cell_id)
+                    else:
+                        infected_cells.add(cell_id)
+        
+                elif edit_mode == "유효 RBC 토글":
+                    if cell_id in valid_cells:
+                        valid_cells.remove(cell_id)
+                    else:
+                        valid_cells.add(cell_id)
+        
+                st.rerun()
 
         cell_id = masks[y, x]
 
