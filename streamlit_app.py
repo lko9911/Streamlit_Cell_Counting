@@ -1,7 +1,7 @@
 import streamlit as st
 import cv2
 import numpy as np
-from cellpose import models 
+from cellpose import models
 from streamlit_image_coordinates import streamlit_image_coordinates
 
 # 페이지 설정 
@@ -39,12 +39,15 @@ st.markdown('<div class="subtitle">AI 기반 적혈구 감염 분석 시스템 (
 # ===============================
 @st.cache_resource
 def load_model():
-    # CellposeModel 대신 정식 클래스인 Cellpose 사용, 모델은 cyto3 지정
-    return models.Cellpose(gpu=True, model_type='cyto3')
+    try:
+        return models.Cellpose(gpu=False, model_type='cyto3')
+    except Exception as e:
+        st.warning("Cyto3 모델 다운로드 실패. 기본 cyto 모델로 전환합니다.")
+        return models.Cellpose(gpu=False, model_type='cyto')
 
 def process_analysis(img_bgr, model):
     img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
-    # cyto3 모델로 세포 분할 실행
+    # 모델 평가 실행
     masks, _, _, _ = model.eval(img_rgb, diameter=None, channels=[0,0])
     
     total_cells = int(np.max(masks))
@@ -52,23 +55,27 @@ def process_analysis(img_bgr, model):
     infected_cells = set()
     
     hsv_img = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
-    # 말라리아 기생충 특유의 보라색 영역
+    # 말라리아 기생충 특유의 보라색 영역 (Hue: 120-170)
     lower_purple = np.array([120, 50, 50]) 
     upper_purple = np.array([170, 255, 255])
     
     for cell_id in range(1, total_cells + 1):
         cell_mask = (masks == cell_id).astype(np.uint8)
-        if np.sum(cell_mask) < 100:
+        if np.sum(cell_mask) < 100: # 너무 작은 객체 제외
             valid_cells.discard(cell_id)
             continue
             
         y_idx, x_idx = np.where(cell_mask == 1)
+        # ROI 추출 시 인덱스 에러 방지
+        if len(y_idx) == 0: continue
+        
         roi_hsv = hsv_img[np.min(y_idx):np.max(y_idx)+1, np.min(x_idx):np.max(x_idx)+1]
         roi_mask = cell_mask[np.min(y_idx):np.max(y_idx)+1, np.min(x_idx):np.max(x_idx)+1]
         
         parasite_mask = cv2.inRange(roi_hsv, lower_purple, upper_purple)
         parasite_in_cell = cv2.bitwise_and(parasite_mask, parasite_mask, mask=roi_mask)
         
+        # 감염체 픽셀이 일정 이상일 경우 감염으로 판단
         if cv2.countNonZero(parasite_in_cell) > 5:
             infected_cells.add(cell_id)
             
@@ -87,7 +94,7 @@ if uploaded_file and st.sidebar.button("🔍 AI 분석 실행"):
     file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
     img_bgr = cv2.imdecode(file_bytes, 1)
     
-    with st.spinner("Cyto3 모델이 세포를 분석 중입니다..."):
+    with st.spinner("모델 로드 및 분석 중입니다... (처음 실행 시 몇 분 소요될 수 있습니다)"):
         model = load_model()
         masks, valid, infected = process_analysis(img_bgr, model)
         st.session_state.state.update({
@@ -104,9 +111,8 @@ if st.session_state.state["analyzed"]:
     s = st.session_state.state
     output = s["orig"].copy()
     
-    # 그리기 최적화
+    # 드로잉 루프
     for cell_id in range(1, int(np.max(s["masks"])) + 1):
-        # 보기 전용 모드에서 제외된 세포는 안 그림
         if cell_id not in s["valid"] and edit_mode == "보기 전용": continue
         
         if cell_id in s["valid"]:
@@ -142,6 +148,7 @@ if st.session_state.state["analyzed"]:
                         s["infected"].remove(cell_id)
                     else:
                         s["infected"].add(cell_id)
+                        s["valid"].add(cell_id) 
                 elif edit_mode == "유효 RBC 토글":
                     if cell_id in s["valid"]:
                         s["valid"].remove(cell_id)
