@@ -1,7 +1,7 @@
 import streamlit as st
 import cv2
 import numpy as np
-from cellpose import models # 모델 로드를 위한 올바른 임포트
+from cellpose import models 
 from streamlit_image_coordinates import streamlit_image_coordinates
 
 # 페이지 설정 
