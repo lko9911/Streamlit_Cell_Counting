@@ -29,7 +29,7 @@ uploaded_file = st.sidebar.file_uploader("현미경 이미지 업로드", type=[
 
 @st.cache_resource # 모델 로딩 속도 최적화
 def load_model():
-    return models.CellposeModel(gpu=True, model_type='cyto3')
+    return models.CellposeModel(gpu=False, model_type='cyto')
 
 def process_image(img_bgr):
     model = load_model()
