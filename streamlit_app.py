@@ -130,7 +130,7 @@ if st.session_state.analyzed:
         else:
             color=(150,150,150)
 
-        cv2.drawContours(output, contours, -1, color, 2)
+        cv2.drawContours(output, contours, -1, color, 1)
 
     output_rgb = cv2.cvtColor(output, cv2.COLOR_BGR2RGB)
 
