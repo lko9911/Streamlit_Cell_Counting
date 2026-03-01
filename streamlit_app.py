@@ -146,7 +146,11 @@ if st.session_state.analyzed:
 
     st.subheader("📊 분석 결과 (이미지를 클릭하여 수정)")
 
-    coords = streamlit_image_coordinates(display_img, key="click")
+    coords = streamlit_image_coordinates(
+        display_img,
+        key="click",
+        use_column_width=True
+    )
 
     # -----------------------
     # 🖱 클릭 처리
