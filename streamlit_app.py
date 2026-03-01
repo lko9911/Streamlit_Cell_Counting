@@ -1,194 +1,185 @@
 import streamlit as st
 import cv2
 import numpy as np
-from cellpose import models
+from PIL import Image
+from cellpose.models import Cellpose
+from streamlit_image_coordinates import streamlit_image_coordinates
 
-# ===============================
-# 페이지 설정
-# ===============================
 st.set_page_config(
-    page_title="Malaria Clinical Analyzer(Cell Counting)",
+    page_title="Malaria Diagnostic System (Cell Counting)",
     layout="wide"
 )
 
 # ===============================
-# CSS (병원 스타일)
+# 🏥 병원용 상단 UI
 # ===============================
 st.markdown("""
 <style>
-.metric-card {
-    background-color: #f8fbff;
-    padding: 20px;
-    border-radius: 12px;
-    border: 1px solid #d9e6f2;
+.main-title {
+    font-size:32px;
+    font-weight:700;
+    color:#0E4C92;
 }
-.title-text {
-    font-size: 28px;
-    font-weight: 600;
-    color: #1f4e79;
-}
-.subtitle-text {
-    font-size: 14px;
-    color: #6c757d;
+.metric-box {
+    background-color:#F4F8FB;
+    padding:20px;
+    border-radius:12px;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# ===============================
-# 유틸 함수
-# ===============================
-def resize_for_ai(img, target_width=1000):
-    h, w = img.shape[:2]
-    if w <= target_width:
-        return img
-    ratio = target_width / w
-    return cv2.resize(img, (target_width, int(h * ratio)))
+st.markdown('<div class="main-title">🧪 Automated Malaria Diagnostic System</div>', unsafe_allow_html=True)
+st.write("AI 기반 적혈구 분석 및 기생충 감염 판별 시스템")
 
-
+# ===============================
+# 모델 캐싱
+# ===============================
 @st.cache_resource
 def load_model():
-    return models.CellposeModel(gpu=False)
+    return Cellpose(gpu=False, model_type="cyto")
 
+model = load_model()
 
 # ===============================
-# 세션 초기화
+# 세션 상태 초기화
 # ===============================
 if "analyzed" not in st.session_state:
     st.session_state.analyzed = False
-    st.session_state.masks = None
-    st.session_state.valid_cells = set()
-    st.session_state.infected_cells = set()
-    st.session_state.cell_contours = {}
-    st.session_state.orig_img = None
-
 
 # ===============================
-# 헤더
+# 이미지 업로드
 # ===============================
-st.markdown('<div class="title-text">🧬 Malaria Clinical Analyzer</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle-text">AI 기반 적혈구 감염 자동 분석 시스템</div>', unsafe_allow_html=True)
-st.divider()
-
-# ===============================
-# 사이드바
-# ===============================
-st.sidebar.header("🔬 검사 설정")
-
-uploaded_file = st.sidebar.file_uploader(
-    "현미경 이미지 업로드",
-    type=["jpg", "jpeg", "png", "tif", "tiff"]
-)
+uploaded_file = st.file_uploader("현미경 이미지 업로드", type=["jpg","png","jpeg","tif","tiff"])
 
 if uploaded_file:
+
     file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
-    st.session_state.orig_img = cv2.imdecode(file_bytes, 1)
+    img_bgr = cv2.imdecode(file_bytes, 1)
+    img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
 
-if st.sidebar.button("🚀 AI 자동 분석 시작"):
-    if st.session_state.orig_img is None:
-        st.warning("이미지를 업로드하세요.")
-    else:
-        with st.spinner("AI가 세포를 분석 중입니다..."):
+    st.image(img_rgb, use_container_width=True)
 
-            img = resize_for_ai(st.session_state.orig_img)
-            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            hsv_img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    if st.button("🔍 AI 분석 시작"):
 
-            model = load_model()
-            masks, flows, styles = model.eval(img_rgb, diameter=30)
+        with st.spinner("AI 분석 중..."):
 
-            total_cells = np.max(masks)
+            masks, flows, styles, diams = model.eval(
+                img_rgb,
+                diameter=None,
+                channels=[0,0]
+            )
+
+            total_cells = int(np.max(masks))
             cell_areas = np.bincount(masks.flatten())
 
-            valid = set()
-            infected = set()
-            contours_dict = {}
+            valid_cells = set(range(1, total_cells+1))
+            infected_cells = set()
 
-            lower_purple = np.array([120, 70, 40])
-            upper_purple = np.array([175, 255, 255])
+            hsv_img = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
 
-            for cell_id in range(1, total_cells + 1):
-                mask = (masks == cell_id).astype(np.uint8)
-                cnts, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                contours_dict[cell_id] = cnts
+            lower_purple = np.array([120,100,50])
+            upper_purple = np.array([170,255,255])
 
-                if cell_areas[cell_id] < 200:
+            for cell_id in range(1, total_cells+1):
+                cell_mask = (masks == cell_id).astype(np.uint8)
+                y_idx, x_idx = np.where(cell_mask==1)
+                if len(y_idx)==0:
                     continue
 
-                valid.add(cell_id)
+                y_min,y_max = np.min(y_idx), np.max(y_idx)
+                x_min,x_max = np.min(x_idx), np.max(x_idx)
 
-                y, x = np.where(mask == 1)
-                if len(y) > 0:
-                    roi_hsv = hsv_img[np.min(y):np.max(y)+1, np.min(x):np.max(x)+1]
-                    roi_m = mask[np.min(y):np.max(y)+1, np.min(x):np.max(x)+1]
-                    p_mask = cv2.inRange(roi_hsv, lower_purple, upper_purple)
-                    if cv2.countNonZero(cv2.bitwise_and(p_mask, p_mask, mask=roi_m)) > 8:
-                        infected.add(cell_id)
+                roi_hsv = hsv_img[y_min:y_max+1, x_min:x_max+1]
+                roi_mask = cell_mask[y_min:y_max+1, x_min:x_max+1]
+
+                parasite_mask = cv2.inRange(roi_hsv, lower_purple, upper_purple)
+                parasite_in_cell = cv2.bitwise_and(parasite_mask, parasite_mask, mask=roi_mask)
+
+                if cv2.countNonZero(parasite_in_cell) > 10:
+                    infected_cells.add(cell_id)
 
             st.session_state.masks = masks
-            st.session_state.valid_cells = valid
-            st.session_state.infected_cells = infected
-            st.session_state.cell_contours = contours_dict
+            st.session_state.valid_cells = valid_cells
+            st.session_state.infected_cells = infected_cells
+            st.session_state.orig = img_bgr
             st.session_state.analyzed = True
 
-        st.success("AI 분석 완료")
-
-
 # ===============================
-# 분석 결과 표시
+# 분석 결과 + 수동 수정
 # ===============================
 if st.session_state.analyzed:
 
-    v = st.session_state.valid_cells
-    i = st.session_state.infected_cells.intersection(v)
-    parasitemia = (len(i) / len(v) * 100) if v else 0
+    masks = st.session_state.masks
+    valid_cells = st.session_state.valid_cells
+    infected_cells = st.session_state.infected_cells
+    orig_bgr = st.session_state.orig
 
-    col1, col2, col3 = st.columns(3)
+    output = orig_bgr.copy()
 
-    col1.metric("유효 RBC 수", len(v))
-    col2.metric("감염 세포 수", len(i))
-    col3.metric("Parasitemia (%)", f"{parasitemia:.2f}")
+    for cell_id in range(1, int(np.max(masks))+1):
 
-    st.divider()
+        cell_mask = (masks==cell_id).astype(np.uint8)
+        contours, _ = cv2.findContours(cell_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-    # 결과 이미지
-    img = resize_for_ai(st.session_state.orig_img)
-    display = img.copy()
-
-    for cid, cnts in st.session_state.cell_contours.items():
-        if cid in v:
-            color = (0, 0, 255) if cid in st.session_state.infected_cells else (0, 200, 0)
-            thickness = 2
+        if cell_id in valid_cells:
+            if cell_id in infected_cells:
+                color=(0,0,255)
+            else:
+                color=(0,255,0)
         else:
-            color = (150, 150, 150)
-            thickness = 1
+            color=(128,128,128)
 
-        cv2.drawContours(display, cnts, -1, color, thickness)
+        cv2.drawContours(output, contours, -1, color, 2)
 
-    st.image(cv2.cvtColor(display, cv2.COLOR_BGR2RGB), use_container_width=True)
+    output_rgb = cv2.cvtColor(output, cv2.COLOR_BGR2RGB)
 
-    # ===============================
-    # 📝 수동 수정 (분석 후만 활성화)
-    # ===============================
-    st.divider()
-    st.subheader("👨‍⚕️ 전문의 수동 수정")
+    st.subheader("📊 분석 결과 (클릭하여 수동 수정 가능)")
 
-    edit_id = st.number_input("세포 ID 입력", min_value=1, step=1)
+    value = streamlit_image_coordinates(output_rgb, key="coords")
 
-    colA, colB = st.columns(2)
+    # -------------------------
+    # 클릭 이벤트 처리
+    # -------------------------
+    if value is not None:
+        x = value["x"]
+        y = value["y"]
+        cell_id = masks[y, x]
 
-    if colA.button("🔴 감염 상태 토글"):
-        if edit_id in st.session_state.infected_cells:
-            st.session_state.infected_cells.remove(edit_id)
-        else:
-            st.session_state.infected_cells.add(edit_id)
-        st.rerun()
+        if cell_id != 0:
+            col1, col2 = st.columns(2)
 
-    if colB.button("⚪ 유효 여부 토글"):
-        if edit_id in st.session_state.valid_cells:
-            st.session_state.valid_cells.remove(edit_id)
-        else:
-            st.session_state.valid_cells.add(edit_id)
-        st.rerun()
+            with col1:
+                if st.button("감염 상태 토글"):
+                    if cell_id in infected_cells:
+                        infected_cells.remove(cell_id)
+                    else:
+                        infected_cells.add(cell_id)
 
-else:
-    st.info("좌측에서 이미지를 업로드하고 분석을 시작하세요.")
+            with col2:
+                if st.button("유효 RBC 토글"):
+                    if cell_id in valid_cells:
+                        valid_cells.remove(cell_id)
+                    else:
+                        valid_cells.add(cell_id)
+
+    # -------------------------
+    # 병원용 결과 패널
+    # -------------------------
+    tot_valid = len(valid_cells)
+    tot_inf = len(infected_cells.intersection(valid_cells))
+    parasitemia = (tot_inf/tot_valid*100) if tot_valid>0 else 0
+
+    st.markdown("### 🏥 Diagnostic Summary")
+
+    c1, c2, c3 = st.columns(3)
+
+    c1.metric("Valid RBC Count", tot_valid)
+    c2.metric("Infected RBC Count", tot_inf)
+    c3.metric("Parasitemia (%)", f"{parasitemia:.2f}")
+
+    if parasitemia < 1:
+        st.success("Low Infection Level")
+    elif parasitemia < 5:
+        st.warning("Moderate Infection Level")
+    else:
+        st.error("High Infection Level – Immediate Clinical Attention Required")
