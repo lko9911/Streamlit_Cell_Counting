@@ -8,7 +8,7 @@ AI 기반 적혈구 감염 분석 시스템
 ## 📌 Overview
 
 Malaria Diagnostic System은 현미경 혈액 도말 이미지를 기반으로 다음을 수행하는  
-Streamlit 기반 웹 애플리케이션입니다:
+Streamlit 기반 웹 애플리케이션
 
 - 🔬 적혈구 자동 분할 (Cellpose)
 - 🧫 말라리아 감염 여부 자동 판별
