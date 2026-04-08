@@ -17,7 +17,6 @@ Streamlit 기반 웹 애플리케이션
 - 📊 Parasitemia(감염률) 자동 계산
 
 > ⚠ This system is intended for research and educational purposes only and not for clinical diagnosis.
-
 ---
 
 ## 🚀 Features
